@@ -1,0 +1,176 @@
+# %%
+# ------------------------------------------------------------
+# Customer Churn Prediction Project
+# Internship Task - Predicting Churn for Subscription-based Service
+# Dataset: Churn_Modelling.csv
+# ------------------------------------------------------------
+
+# Importing necessary libraries
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Models and utilities
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, roc_auc_score, roc_curve
+
+# To suppress warnings for cleaner output
+import warnings
+warnings.filterwarnings('ignore')
+
+# ------------------------------------------------------------
+# Step 1: Load the dataset
+# ------------------------------------------------------------
+df = pd.read_csv("Churn_Modelling.csv")
+df.head()
+
+
+# %%
+# ------------------------------------------------------------
+# Step 2: Initial Data Understanding
+# ------------------------------------------------------------
+
+# Display dataset structure
+print("Shape of dataset:", df.shape)
+df.info()
+
+# Check for missing values
+print("\nMissing Values:\n", df.isnull().sum())
+
+
+# %%
+# ------------------------------------------------------------
+# Step 3: Drop irrelevant columns
+# 'RowNumber', 'CustomerId', and 'Surname' do not help in prediction
+# ------------------------------------------------------------
+df.drop(['RowNumber', 'CustomerId', 'Surname'], axis=1, inplace=True)
+
+
+# %%
+# ------------------------------------------------------------
+# Step 4: Encoding Categorical Variables
+# Geography and Gender are categorical — encode them
+# ------------------------------------------------------------
+
+# Label Encoding for 'Gender' (Binary category)
+le_gender = LabelEncoder()
+df['Gender'] = le_gender.fit_transform(df['Gender'])  # Male=1, Female=0
+
+# One-hot encoding for 'Geography' (Nominal with >2 classes)
+df = pd.get_dummies(df, columns=['Geography'], drop_first=True)  # Avoid dummy variable trap
+df.head()
+
+
+# %%
+# ------------------------------------------------------------
+# Step 5: Define Features and Target
+# ------------------------------------------------------------
+X = df.drop('Exited', axis=1)   # Features
+y = df['Exited']                # Target (1 = churned, 0 = retained)
+
+
+# %%
+# ------------------------------------------------------------
+# Step 6: Train-Test Split and Feature Scaling
+# ------------------------------------------------------------
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Standardize features for models sensitive to scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+
+# %%
+# ------------------------------------------------------------
+# Step 7A: Logistic Regression Model
+# ------------------------------------------------------------
+lr_model = LogisticRegression()
+lr_model.fit(X_train_scaled, y_train)
+y_pred_lr = lr_model.predict(X_test_scaled)
+
+print("🔹 Logistic Regression Performance:\n")
+print(classification_report(y_test, y_pred_lr))
+print("Accuracy:", accuracy_score(y_test, y_pred_lr))
+
+
+# %%
+# ------------------------------------------------------------
+# Step 7B: Random Forest Classifier
+# ------------------------------------------------------------
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+rf_model.fit(X_train, y_train)
+y_pred_rf = rf_model.predict(X_test)
+
+print("🔹 Random Forest Performance:\n")
+print(classification_report(y_test, y_pred_rf))
+print("Accuracy:", accuracy_score(y_test, y_pred_rf))
+
+
+# %%
+# ------------------------------------------------------------
+# Step 7C: Gradient Boosting Classifier
+# ------------------------------------------------------------
+gb_model = GradientBoostingClassifier(n_estimators=100, learning_rate=0.1, random_state=42)
+gb_model.fit(X_train, y_train)
+y_pred_gb = gb_model.predict(X_test)
+
+print("🔹 Gradient Boosting Performance:\n")
+print(classification_report(y_test, y_pred_gb))
+print("Accuracy:", accuracy_score(y_test, y_pred_gb))
+
+
+# %%
+# ------------------------------------------------------------
+# Step 8: Confusion Matrix for Gradient Boosting
+# ------------------------------------------------------------
+cm = confusion_matrix(y_test, y_pred_gb)
+plt.figure(figsize=(6,4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.title("Confusion Matrix - Gradient Boosting")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.show()
+
+
+# %%
+# ------------------------------------------------------------
+# Step 9: ROC Curve & AUC Score - Gradient Boosting
+# ------------------------------------------------------------
+y_proba = gb_model.predict_proba(X_test)[:, 1]
+fpr, tpr, thresholds = roc_curve(y_test, y_proba)
+roc_auc = roc_auc_score(y_test, y_proba)
+
+plt.figure(figsize=(8,5))
+plt.plot(fpr, tpr, label="Gradient Boosting (AUC = %0.2f)" % roc_auc)
+plt.plot([0,1], [0,1], 'k--')
+plt.title("ROC Curve - Gradient Boosting")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.legend(loc='lower right')
+plt.grid(True)
+plt.show()
+
+
+# %%
+# ------------------------------------------------------------
+# Step 10: Feature Importance (Gradient Boosting)
+# ------------------------------------------------------------
+feature_importance = pd.DataFrame({
+    'Feature': X.columns,
+    'Importance': gb_model.feature_importances_
+}).sort_values(by='Importance', ascending=False)
+
+# Plot top 10 features
+plt.figure(figsize=(10,6))
+sns.barplot(data=feature_importance.head(10), x='Importance', y='Feature', palette='viridis')
+plt.title("Top 10 Feature Importances - Gradient Boosting")
+plt.tight_layout()
+plt.show()
+
+
+
